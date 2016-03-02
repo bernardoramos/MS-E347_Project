@@ -10,7 +10,7 @@ model <- function(tranche = list(Ku=1, Kd=0, F=0, T=3, n=100), theta, method="fo
   # T: the maturity of the CDS
   # n: the number of contracts
   # Theta is a 4-dimensional vector containing parameters (c, kappa, delta, lambda0)
-
+  
   Ku <- tranche$Ku
   Kd <- tranche$Kd
   T <- tranche$T
@@ -48,12 +48,6 @@ PVPayments <- function(tranche, theta, method) {
     exp(-r * s) * expectation_U(distribution, s, Ku, Kd, n, method = method)
   }
   D <- exp(-r * T) * expectation_U(distribution, T, Ku, Kd, n, method = method) + r * integr(func, 0, T, delta = 1/100)
-  print("D")
-  print(D)
-  print("expectation_U")
-  print(expectation_U(distribution, T, Ku, Kd, n, method = method))
-  print("distribution")
-  print(distribution)
   return(D)
 }
 
@@ -61,7 +55,7 @@ expectation_U <- function(distribution, s, Ku, Kd, n=10, method) {
   # This is the expectation E(U_t), computed using the fact that U_t = (L_t - Kd * n)_+  - (L_t - Ku * n)_+
   # distribution must be a matrix 
   ### For now, we assume L = 0.6 * N
-  values <- 0.6 * seq(0, length(distribution)) 
+  values <- 0.6 * seq(0, length(distribution)-1) 
   expectation <- sum((pmax(values - Kd * n, 0) - pmax(values - Ku * n, 0))* distribution)
   return(expectation)
 }
@@ -78,7 +72,7 @@ integr <- function(f, lower, upper, delta=1/12) {
 premium_notional <- function(n, distribution) {
   # This function computes the expectation of the premium notional, E(I_t)
   # Note: verification that sum(distribution) = 1?
-  values <- seq(0, length(distribution))
+  values <- seq(0, length(distribution)-1) 
   expectation <- n - sum(pmin(n, values) * distribution)
   return(expectation)
 }
@@ -94,27 +88,22 @@ get_distribution <- function(theta, T, method="fourier", distr="N") {
     if (distr == "N") {
       u <- matrix(c(0,1), nrow=N, ncol=2, byrow=TRUE)
     } else {
-      u <- matrix(c(0,1), nrow=N, ncol=2, byrow=TRUE)
+      u <- matrix(c(1,0), nrow=N, ncol=2, byrow=TRUE)
     }
-    u <- u * 1i*2*pi*(1:(N))/N
+    u <- u * 1i*2*pi*(0:(N-1))/N
     alp <- a(u, theta, T, N=100) 
     bet <- b(u, theta, T, N=100) 
-    print("alp")
-    print(alp)
-    print("bet")
-    print(bet)
-    print("transform")
-    print(transform)
     lambda0 <- theta[4]
     transform <- exp(alp + bet * lambda0)
     distr <- fft(transform, inverse=TRUE)
     distr <- distr/length(distr) #We divide to normalize the transform
     distr <- Mod(distr)
+    distr <- distr[1:(N*0.6)]/sum(distr[1:(N*0.6)]) #We normalize the distribution
+    #    pllot <- ggplot(data=data.frame(x=seq(length(distr)),y=distr), aes(x=x,y=y)) + geom_line()
+    #    plot(pllot)
   } else if (method == "derivative") {
     if (method != "N") {warning("Using the derivative method for the distribution of L")}
   }
-  print("distributoon in get_distr")
-  print(distr)
   return(distr)
 }
 
@@ -143,8 +132,8 @@ partial_b <- function(y, u, params){
 b <- function(u, params, T, N, full=FALSE){
   h <- T/N
   
-  y <- matrix(0, ncol=N+1, nrow=length(u))
-  res <- matrix(0, ncol=N+1, nrow=length(u))
+  y <- matrix(0, ncol=N+1, nrow=nrow(u))
+  res <- matrix(0, ncol=N+1, nrow=nrow(u))
   
   for (i in 1:N){
     k1 <- partial_b(y[, i], u, params)
@@ -183,3 +172,4 @@ a <- function(u, params, T, N){
   }
   return(res)
 }
+
