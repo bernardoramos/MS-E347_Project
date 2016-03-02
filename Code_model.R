@@ -1,45 +1,55 @@
 
-r <- 0.05
-K <- 0
 
-model <- function(tranche = list(Ku=1, Kd=0, F=0, T=3, n=100), theta, method="fourier") {
+model <- function(tranche = list(Ku=0.1, Kd=0, n=100, upfront=TRUE), theta, T, method="fourier") {
+  # This function computes the rate (either upfront or running) implied by the parameters in theta.
+  # PARAMETERS:
   # Tranche is a list containing the following elements: 
-  # Ku: upper tranche limit
-  # Kd: lower tranche limit
-  # F: the upfront payment rate for the tranche
-  # T: the maturity of the CDS
-  # n: the number of contracts
+  #   Ku: upper tranche limit
+  #   Kd: lower tranche limit
+  #   T: the maturity of the CDS
+  #   n: the number of contracts
+  #   upfront: "upfront" (TRUE) or "running" (FALSE), to indicate whether the desired quantity is the upfront rate or the quarterly CDS spread
   # Theta is a 4-dimensional vector containing parameters (c, kappa, delta, lambda0)
   
   Ku <- tranche$Ku
   Kd <- tranche$Kd
-  T <- tranche$T
-  F <- tranche$F 
   n <- tranche$n
+  is_upfront <- tranche$upfront
   #We first compute the distribution of N_t and L_t based on the transforms
+  adv_settings <- mget(c("print_distribution", "show_distribution_plot"), ifnotfound = c(FALSE, FALSE), envir=.GlobalEnv)
   N_distribution <- get_distribution(theta, T, method="fourier", distr="N")
-  print(N_distribution)
-  #Compute the value of payments
-  D <- PVPayments(tranche, theta, method = method)
-  sum <- 0
-  premium_dates <- seq(0, T - 1/4, 1/4)
-  cm <- 1/4
-  for (tm in premium_dates) {
-    sum <- sum + exp(-r*tm) * cm * premium_notional(tm, N_distribution)
+  if (adv_settings$show_distribution_plot) {
+    pllot <- ggplot(data=data.frame(x=seq(length(N_distribution)),y=N_distribution), aes(x=x,y=y)) + geom_line()
+    plot(pllot)
   }
-  print(sum)
-  print(D)
-  print(F)
-  print(K)
-  S <- (D - F * K) / sum
-  return(S)
+  if (adv_settings$print_distribution) {
+    print(N_distribution)
+  }
+  #Compute the value of payments
+  D <- PVPayments(tranche, theta, T, method = method)
+  # We now compute the 
+  if (is_upfront) {
+    K <- n * (Ku - Kd)
+    F <- D / K
+    print(c("Upfront rate:", D/K))
+    return(F)
+  } else {
+    sum <- 0
+    premium_dates <- seq(0, T - 1/4, 1/4)
+    cm <- 1/4
+    for (tm in premium_dates) {
+      sum <- sum + exp(-r*tm) * cm * premium_notional(tm, N_distribution)
+    }
+    S <- D / sum
+    print(c("Running spread:", S))
+    return(S)
+  }
 }
 
-PVPayments <- function(tranche, theta, method) {
+PVPayments <- function(tranche, theta, T, method) {
   # This function computes the present value of premium payments, D_t given in formula 34
   Ku <- tranche$Ku
   Kd <- tranche$Kd
-  T <- tranche$T
   F <- tranche$F 
   n <- tranche$n
   distribution <- get_distribution(theta, T, method=method, distr="L") #######
@@ -47,15 +57,16 @@ PVPayments <- function(tranche, theta, method) {
     distribution <- get_distribution(theta=theta, s, method=method, distr="L")
     exp(-r * s) * expectation_U(distribution, s, Ku, Kd, n, method = method)
   }
-  D <- exp(-r * T) * expectation_U(distribution, T, Ku, Kd, n, method = method) + r * integr(func, 0, T, delta = 1/100)
+  adv_settings <- mget(c("n_points_integral"), ifnotfound = c(30), envir=.GlobalEnv)
+  D <- exp(-r * T) * expectation_U(distribution, T, Ku, Kd, n, method = method) + r * integr(func, 0, T, delta = 1/adv_settings$n_points_integral)
   return(D)
 }
 
 expectation_U <- function(distribution, s, Ku, Kd, n=10, method) {
   # This is the expectation E(U_t), computed using the fact that U_t = (L_t - Kd * n)_+  - (L_t - Ku * n)_+
   # distribution must be a matrix 
-  ### For now, we assume L = 0.6 * N
-  values <- 0.6 * seq(0, length(distribution)-1) 
+  ### TODO: For now, we assume L = 0.6 * N. Change this code along with the computation of a and b when accounting for general Ls
+  values <- 0.6 * seq(0, length(distribution)-1)
   expectation <- sum((pmax(values - Kd * n, 0) - pmax(values - Ku * n, 0))* distribution)
   return(expectation)
 }
@@ -84,7 +95,8 @@ get_distribution <- function(theta, T, method="fourier", distr="N") {
     u <- c(1, 0)
   }
   if (method == "fourier") {
-    N <- 120 ### OR N = 1100? ####### THINK ABOUT THIS
+    adv_settings <- mget(c("truncate_inverse_transform", "number_points_transform"), ifnotfound = c(FALSE, n*2), envir=.GlobalEnv)
+    N <- adv_settings$number_points_transform
     if (distr == "N") {
       u <- matrix(c(0,1), nrow=N, ncol=2, byrow=TRUE)
     } else {
@@ -98,9 +110,11 @@ get_distribution <- function(theta, T, method="fourier", distr="N") {
     distr <- fft(transform, inverse=TRUE)
     distr <- distr/length(distr) #We divide to normalize the transform
     distr <- Mod(distr)
-    distr <- distr[1:(N*0.6)]/sum(distr[1:(N*0.6)]) #We normalize the distribution
-    #    pllot <- ggplot(data=data.frame(x=seq(length(distr)),y=distr), aes(x=x,y=y)) + geom_line()
-    #    plot(pllot)
+    if (adv_settings$truncate_inverse_transform) {
+      distr <- distr[1:floor(N*0.6)]/sum(distr[1:floor(N*0.6)]) #We normalize the distribution ## TODO: what to do about this?
+    } else {
+      distr <- distr[1:N]/sum(distr[1:N]) #We normalize the distribution
+    }
   } else if (method == "derivative") {
     if (method != "N") {warning("Using the derivative method for the distribution of L")}
   }
