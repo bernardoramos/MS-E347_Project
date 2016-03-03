@@ -11,12 +11,13 @@ model <- function(tranche = list(Ku=0.1, Kd=0, n=100, upfront=TRUE), theta, T, m
   #   upfront: "upfront" (TRUE) or "running" (FALSE), to indicate whether the desired quantity is the upfront rate or the quarterly CDS spread
   # Theta is a 4-dimensional vector containing parameters (c, kappa, delta, lambda0)
   
+  
   Ku <- tranche$Ku
   Kd <- tranche$Kd
   n <- tranche$n
   is_upfront <- tranche$upfront
   #We first compute the distribution of N_t and L_t based on the transforms
-  adv_settings <- mget(c("print_distribution", "show_distribution_plot"), ifnotfound = c(FALSE, FALSE), envir=.GlobalEnv)
+  adv_settings <- mget(c("print_distribution", "show_distribution_plot", "print_spreads"), ifnotfound = c(FALSE, FALSE, FALSE), envir=.GlobalEnv)
   N_distribution <- get_distribution(theta, T, method="fourier", distr="N")
   if (adv_settings$show_distribution_plot) {
     pllot <- ggplot(data=data.frame(x=seq(length(N_distribution)),y=N_distribution), aes(x=x,y=y)) + geom_line()
@@ -31,7 +32,7 @@ model <- function(tranche = list(Ku=0.1, Kd=0, n=100, upfront=TRUE), theta, T, m
   if (is_upfront) {
     K <- n * (Ku - Kd)
     F <- D / K
-    print(c("Upfront rate:", D/K))
+    if (print_spreads) {print(c("Upfront rate:", D/K))}
     return(F)
   } else {
     sum <- 0
@@ -41,7 +42,7 @@ model <- function(tranche = list(Ku=0.1, Kd=0, n=100, upfront=TRUE), theta, T, m
       sum <- sum + exp(-r*tm) * cm * premium_notional(tm, N_distribution)
     }
     S <- D / sum
-    print(c("Running spread:", S))
+    if (print_spreads) {print(c("Running spread:", S))}
     return(S)
   }
 }

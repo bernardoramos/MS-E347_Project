@@ -20,6 +20,7 @@ theta0 <- c(1, 0.1, 10, 1)
 truncate_inverse_transform <- TRUE
 print_distribution <- FALSE
 show_distribution_plot <- FALSE
+print_spreads <- TRUE
 number_points_transform <- 200   ####### TODO: THINK ABOUT THIS
 n_points_integral <- 12
 
@@ -44,10 +45,11 @@ for (d in dates) {
 # RUN OPTIMIZATION
 ###
 
-M <- 100 #The number of initial points
+M <- 1 #The number of initial points
 # We now create the data frame containing results
 na_rep <- rep(NA, length(dates))
-opt_results <- data.frame(date=dates, c=na_rep, kappa=na_rep, delta=na_rep, lambda0=na_rep, obj_value=na_rep, AAPE=na_rep)
+opt_results <- data.frame(c=na_rep, kappa=na_rep, delta=na_rep, lambda0=na_rep, obj_value=na_rep, AAPE=na_rep)
+rownames(opt_results) <- dates
 # We run the optimization for each date available
 for (d in dates) {
   mid <- data_list[[d]]
@@ -65,7 +67,7 @@ for (d in dates) {
     theta0 <- c(c, kappa, delta, lambda0)
     
     # Optimization
-    res <- optim(theta0, objective)
+    res <- optim(theta0, objective, method="BFGS")
     val <- res$value
     
     if (val<min_so_far){
@@ -74,7 +76,7 @@ for (d in dates) {
     }
   }  
   aape <- AAPE(params)
-  opt_results[d, c("c", "kappa", "delta", "opt", "obj_value", "AAPE")] <- c(params, min_so_far, aape)
+  opt_results[d, c("c", "kappa", "delta", "lambda0", "obj_value", "AAPE")] <- c(params, min_so_far, aape)
 }
 
 ###  
