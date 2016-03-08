@@ -51,7 +51,6 @@ PVPayments <- function(tranche, theta, T, method) {
   # This function computes the present value of premium payments, D_t given in formula 34
   Ku <- tranche$Ku
   Kd <- tranche$Kd
-  F <- tranche$F 
   n <- tranche$n
   distribution <- get_distribution(theta, T, method=method, distr="L") #######
   func <- function(s) {
@@ -84,7 +83,7 @@ integr <- function(f, lower, upper, delta=1/12) {
 premium_notional <- function(n, distribution) {
   # This function computes the expectation of the premium notional, E(I_t)
   # Note: verification that sum(distribution) = 1?
-  values <- seq(0, length(distribution)-1) 
+  values <- seq(0, length(distribution)-1)
   expectation <- n - sum(pmin(n, values) * distribution)
   return(expectation)
 }
@@ -104,8 +103,8 @@ get_distribution <- function(theta, T, method="fourier", distr="N") {
       u <- matrix(c(1,0), nrow=N, ncol=2, byrow=TRUE)
     }
     u <- u * 1i*2*pi*(0:(N-1))/N
-    alp <- a(u, theta, T, N=100) 
-    bet <- b(u, theta, T, N=100) 
+    alp <- a(u, theta, T, N=12) 
+    bet <- b(u, theta, T, N=12) 
     lambda0 <- theta[4]
     transform <- exp(alp + bet * lambda0)
     distr <- fft(transform, inverse=TRUE)
@@ -144,7 +143,7 @@ partial_b <- function(y, u, params){
 
 # returns a vector of size N+1 from t=0 to t=T que l'on renverse
 
-b <- function(u, params, T, N, full=FALSE){
+b <- function(u, params, T, N, full=FALSE) {
   h <- T/N
   
   y <- matrix(0, ncol=N+1, nrow=nrow(u))

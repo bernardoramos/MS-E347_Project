@@ -20,12 +20,14 @@ theta0 <- c(1, 0.1, 10, 1)
 truncate_inverse_transform <- TRUE
 print_distribution <- FALSE
 show_distribution_plot <- FALSE
-print_spreads <- TRUE
+print_spreads <- FALSE
 number_points_transform <- 200   ####### TODO: THINK ABOUT THIS
 n_points_integral <- 12
 
 #Run model (for debugging/test purposes)
-model(tranche = tranche[[1]], theta=theta0, method=method)
+t0 <- proc.time()
+model(tranche = tranche[[1]], theta=theta0, T=3, method=method)
+print(proc.time()-t0)
 
 ###
 # IMPORT AND PREPROCESS DATA
@@ -67,7 +69,7 @@ for (d in dates) {
     theta0 <- c(c, kappa, delta, lambda0)
     
     # Optimization
-    res <- optim(theta0, objective, method="BFGS")
+    res <- optim(theta0, objective)
     val <- res$value
     
     if (val<min_so_far){
