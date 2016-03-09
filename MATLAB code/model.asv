@@ -1,0 +1,16 @@
+function S=model(tranche, params, T, N, truncation)
+    Ku=tranche(1);
+    Kd=tranche(2);
+    n=tranche(3);
+    is_upfront=tranche(4);
+    
+    [Lt, Nt] = get_distribution(params, T, N, truncation);
+    D = PVPayments(tranche, params, T, N);
+    
+    if (is_upfront)
+        K=n*(Ku-Kd);
+        F=D/K;
+        
+    end
+    
+end

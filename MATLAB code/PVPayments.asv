@@ -1,0 +1,41 @@
+function D = PVPayments(tranche, params, T, N)
+    Ku=tranche(1);
+    Kd=tranche(2);
+    n=tranche(3);
+    
+    [Lt, Nt] = get_distribution(params, T, N, truncation)
+    
+    grille = linspace(0, T, 24);
+    for i=1:length(grille)
+        s=grille(i);
+        get_distribution(params, s, N, truncation);
+    end
+end
+
+
+  func <- function(s) {
+    distribution <- get_distribution(theta=theta, s, method=method, distr="L")
+    exp(-r * s) * expectation_U(distribution, s, Ku, Kd, n, method = method)
+  }
+  adv_settings <- mget(c("n_points_integral"), ifnotfound = c(30), envir=.GlobalEnv)
+  D <- exp(-r * T) * expectation_U(distribution, T, Ku, Kd, n, method = method) + r * integr(func, 0, T, delta = 1/adv_settings$n_points_integral)
+  return(D)
+}
+
+expectation_U <- function(distribution, s, Ku, Kd, n=10, method) {
+  # This is the expectation E(U_t), computed using the fact that U_t = (L_t - Kd * n)_+  - (L_t - Ku * n)_+
+  # distribution must be a matrix 
+  ### TODO: For now, we assume L = 0.6 * N. Change this code along with the computation of a and b when accounting for general Ls
+  values <- 0.6 * seq(0, length(distribution)-1)
+  expectation <- sum((pmax(values - Kd * n, 0) - pmax(values - Ku * n, 0))* distribution)
+  return(expectation)
+}
+
+integr <- function(f, lower, upper, delta=1/12) {
+  val <- 0
+  if (lower<upper) {
+    n <- length(seq(lower+delta, upper, by=delta))
+    for (s in seq(lower+delta, upper, by=delta)) { val <- val + f(s) / n }
+  }
+  return(val)
+}
